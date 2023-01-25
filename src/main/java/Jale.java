@@ -184,8 +184,8 @@ public class Jale {
         final Thread thread = new Thread(testRunnable);
         thread.start();
  */
-
-        // NIO to be implemented
+        //LetsEncrypt will visit this SSL server from multiple IPs
+        // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
         while (true) {
             SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
             // Get an SSLParameters object from the SSLSocket
@@ -253,10 +253,13 @@ public class Jale {
         X509Certificate cert = CertificateUtils.
                 createTlsAlpn01Certificate(certKeyPair, identifier, acmeValidation);
 
+        //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
+        Runnable nanoServer = new NanoTLSServer(certKeyPair, cert);
+        new Thread(nanoServer).start();
+        //shall we sleep a few seconds?
         return challenge;
     }
-
-
+    
     /**
      * Generates a certificate for the given domains. Also takes care for the registration
      * process.
