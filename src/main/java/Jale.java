@@ -9,16 +9,13 @@ import org.shredzone.acme4j.util.KeyPairUtils;
 
 import javax.net.ssl.*;
 import javax.swing.*;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.*;
 import java.net.URI;
 import java.security.*;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -130,9 +127,16 @@ public class Jale {
     }
 
     //start a thread for simple provisional ssl server
-    private void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+    public void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException, CertificateException {
         //sample code from http://www.java2s.com/example/java-api/javax/net/ssl/sslserversocket/accept-0-0.html
 
+        KeyStore ks = KeyStore.getInstance("PKCS12");
+
+        FileInputStream inputStream = new FileInputStream("D:\\work\\Jale\\challengeCert.pfx");
+        inputStream.close();
+        ks.load(inputStream, "changeit".toCharArray());
+
+/*
         // create the KeyStore and load the JKS file
         KeyStore ks = KeyStore.getInstance("JKS");
         X509Certificate[] chain = new X509Certificate[] { serverCertificate };
@@ -142,7 +146,7 @@ public class Jale {
 
 // store the private key
         ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
-
+*/
 
 // may take a look of https://docs.oracle.com/javase/10/security/sample-code-illustrating-secure-socket-connection-client-and-server.htm#JSSEC-GUID-3561ED02-174C-4E65-8BB1-5995E9B7282C
         // initialize key and trust manager factory
@@ -402,7 +406,8 @@ public class Jale {
         Collection<String> domains = Arrays.asList(domainsTest);
         try {
             Jale ct = new Jale();
-            ct.fetchCertificate(domains, "changeit", "support@bletvhley19.com");
+            ct.startSSLServer(null, null);
+//            ct.fetchCertificate(domains, "changeit", "support@bletvhley19.com");
         } catch (Exception ex) {
             System.out.println("Failed to get a certificate for domains " + domains + ex);
         }
