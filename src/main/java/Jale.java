@@ -127,15 +127,13 @@ public class Jale {
     }
 
     //start a thread for simple provisional ssl server
-    public void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException, CertificateException {
+    public void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException, CertificateException, UnrecoverableKeyException {
         //sample code from http://www.java2s.com/example/java-api/javax/net/ssl/sslserversocket/accept-0-0.html
 
         KeyStore ks = KeyStore.getInstance("PKCS12");
-
         FileInputStream inputStream = new FileInputStream("D:\\work\\Jale\\challengeCert.pfx");
-        inputStream.close();
         ks.load(inputStream, "changeit".toCharArray());
-
+        inputStream.close();
 /*
         // create the KeyStore and load the JKS file
         KeyStore ks = KeyStore.getInstance("JKS");
@@ -152,6 +150,14 @@ public class Jale {
         // initialize key and trust manager factory
 //        final KeyManagerFactory keyManagerFactory =  KeyManagerFactory.getInstance( KeyManagerFactory.getDefaultAlgorithm() );
 //        keyManagerFactory.init( ks, "changeit".toCharArray() );
+
+        // https://stackoverflow.com/questions/15076820/java-sslhandshakeexception-no-cipher-suites-in-common
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory
+                .getDefaultAlgorithm());
+        kmf.init(ks, "changeit".toCharArray());
+
+
+
         final TrustManagerFactory trustManagerFactory =
                 TrustManagerFactory.getInstance( TrustManagerFactory.getDefaultAlgorithm() );
         trustManagerFactory.init( ks );
@@ -160,8 +166,7 @@ public class Jale {
         final SSLContext sslContext = SSLContext.getInstance( "TLS" );
         // sslContext.init( keyManagerFactory.getKeyManagers(),
         //      trustManagerFactory.getTrustManagers(), new SecureRandom() );
-        sslContext.init( null,
-                trustManagerFactory.getTrustManagers(), null );
+        sslContext.init( kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), null );
 
 
 
@@ -172,7 +177,7 @@ public class Jale {
         final SSLServerSocket sslServerSocket = (SSLServerSocket) sslServerSocketFactory
                 .createServerSocket(serverPort);
 
-        sslServerSocket.setNeedClientAuth(true);
+//        sslServerSocket.setNeedClientAuth(true);
         sslServerSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
 /*
         final TestRunnable testRunnable = new TestRunnable(serverPort);
@@ -188,7 +193,7 @@ public class Jale {
         // Populate SSLParameters with the ALPN values
         // As this is server side, put them in order of preference
 //        String[] serverAPs ={ "h2", "http/1.1", "tls-alpn-01" };
-        String[] serverAPs ={ "tls-alpn-01" };
+        String[] serverAPs ={ "acme-tls/1" };
         sslp.setApplicationProtocols(serverAPs);
 
         // If necessary at any time, get the ALPN values set on the
