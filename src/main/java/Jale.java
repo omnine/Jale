@@ -184,35 +184,40 @@ public class Jale {
         final Thread thread = new Thread(testRunnable);
         thread.start();
  */
-        SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
 
+        // NIO to be implemented
+        while (true) {
+            SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
+            // Get an SSLParameters object from the SSLSocket
+            SSLParameters sslp = sslSocket.getSSLParameters();
 
-        // Get an SSLParameters object from the SSLSocket
-        SSLParameters sslp = sslSocket.getSSLParameters();
-
-        // Populate SSLParameters with the ALPN values
-        // As this is server side, put them in order of preference
+            // Populate SSLParameters with the ALPN values
+            // As this is server side, put them in order of preference
 //        String[] serverAPs ={ "h2", "http/1.1", "tls-alpn-01" };
-        String[] serverAPs ={ "acme-tls/1" };
-        sslp.setApplicationProtocols(serverAPs);
+            String[] serverAPs ={ "acme-tls/1" };
+            sslp.setApplicationProtocols(serverAPs);
 
-        // If necessary at any time, get the ALPN values set on the
-        // SSLParameters object with:
-        // String serverAPs = sslp.setApplicationProtocols();
+            // If necessary at any time, get the ALPN values set on the
+            // SSLParameters object with:
+            // String serverAPs = sslp.setApplicationProtocols();
 
-        // Populate the SSLSocket object with the ALPN values
-        sslSocket.setSSLParameters(sslp);
+            // Populate the SSLSocket object with the ALPN values
+            sslSocket.setSSLParameters(sslp);
 
-        sslSocket.startHandshake();
+            sslSocket.startHandshake();
 
-        // After the handshake, get the application protocol that
-        // has been negotiated
+            // After the handshake, get the application protocol that
+            // has been negotiated
 
-        String ap = sslSocket.getApplicationProtocol();
-        System.out.println("Application Protocol server side: \"" + ap + "\"");
+            String ap = sslSocket.getApplicationProtocol();
+            System.out.println("Application Protocol server side: \"" + ap + "\"");
 
-        // Continue with the work of the server
-        sslSocket.close();
+            // Continue with the work of the server
+            sslSocket.close();
+        }
+
+
+
 
         /*
         InputStream sslIS = sslSocket.getInputStream();
