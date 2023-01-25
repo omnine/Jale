@@ -1,5 +1,6 @@
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.shredzone.acme4j.*;
+import org.shredzone.acme4j.Certificate;
 import org.shredzone.acme4j.challenge.Challenge;
 import org.shredzone.acme4j.challenge.TlsAlpn01Challenge;
 import org.shredzone.acme4j.exception.AcmeException;
@@ -7,13 +8,14 @@ import org.shredzone.acme4j.util.CertificateUtils;
 import org.shredzone.acme4j.util.KeyPairUtils;
 
 import javax.net.ssl.*;
+import javax.swing.*;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.security.KeyPair;
-import java.security.KeyStore;
-import java.security.Security;
-import java.security.cert.Certificate;
+import java.net.URI;
+import java.security.*;
+
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 import java.io.IOException;
@@ -29,6 +31,10 @@ public class Jale {
 
     // RSA key size of generated key pairs
     private static final int KEY_SIZE = 2048;
+
+    // Create a session for Let's Encrypt.
+    // Use "acme://letsencrypt.org" for production server
+    String acmeServerUrl = "acme://letsencrypt.org/staging";
 
     /**
      * Loads a user key pair from {@link #USER_KEY_FILE}. If the file does not exist, a
@@ -56,17 +62,83 @@ public class Jale {
         }
     }
 
+    /**
+     * Loads a domain key pair from {@link #DOMAIN_KEY_FILE}. If the file does not exist,
+     * a new key pair is generated and saved.
+     *
+     * @return Domain {@link KeyPair}.
+     */
+    private KeyPair loadOrCreateDomainKeyPair() throws IOException {
+        if (DOMAIN_KEY_FILE.exists()) {
+            try (FileReader fr = new FileReader(DOMAIN_KEY_FILE)) {
+                return KeyPairUtils.readKeyPair(fr);
+            }
+        } else {
+            KeyPair domainKeyPair = KeyPairUtils.createKeyPair(KEY_SIZE);
+            try (FileWriter fw = new FileWriter(DOMAIN_KEY_FILE)) {
+                KeyPairUtils.writeKeyPair(domainKeyPair, fw);
+            }
+            return domainKeyPair;
+        }
+    }
+
+
+    /**
+     * Finds your {@link Account} at the ACME server. It will be found by your user's
+     * public key. If your key is not known to the server yet, a new account will be
+     * created.
+     * <p>
+     * This is a simple way of finding your {@link Account}. A better way is to get the
+     * URL of your new account with {@link Account#getLocation()} and store it somewhere.
+     * If you need to get access to your account later, reconnect to it via  by using the stored location.
+     *
+     * @param session
+     *         {@link Session} to bind with
+     * @return {@link Account}
+     */
+    private Account findOrRegisterAccount(Session session, KeyPair accountKey) throws AcmeException {
+        // Ask the user to accept the TOS, if server provides us with a link.
+        URI tos = session.getMetadata().getTermsOfService();
+        if (tos != null) {
+            acceptAgreement(tos);
+        }
+
+        Account account = new AccountBuilder()
+                .agreeToTermsOfService()
+                .useKeyPair(accountKey)
+                .create(session);
+//        LOG.info("Registered a new user, URL: {}", account.getLocation());
+
+        return account;
+    }
+
+    /**
+     * Presents the user a link to the Terms of Service, and asks for confirmation. If the
+     * user denies confirmation, an exception is thrown.
+     *
+     * @param agreement
+     *         {@link URI} of the Terms of Service
+     */
+    public void acceptAgreement(URI agreement) throws AcmeException {
+        int option = JOptionPane.showConfirmDialog(null,
+                "Do you accept the Terms of Service?\n\n" + agreement,
+                "Accept ToS",
+                JOptionPane.YES_NO_OPTION);
+        if (option == JOptionPane.NO_OPTION) {
+            throw new AcmeException("User did not accept Terms of Service");
+        }
+    }
+
     //start a thread for simple provisional ssl server
-    private void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) {
+    private void startSSLServer(KeyPair serverKeyPair, X509Certificate serverCertificate) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
         //sample code from http://www.java2s.com/example/java-api/javax/net/ssl/sslserversocket/accept-0-0.html
 
         // create the KeyStore and load the JKS file
         KeyStore ks = KeyStore.getInstance("JKS");
-        Certificate[] chain = new Certificate[] { serverCertificate };
+        X509Certificate[] chain = new X509Certificate[] { serverCertificate };
 
         String alias1 = serverCertificate.getSubjectX500Principal().getName();
         ks.setCertificateEntry(alias1, serverCertificate);
-
 
 // store the private key
         ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
@@ -157,7 +229,7 @@ public class Jale {
          */
     }
 
-    private Challenge tlsAlpnChallenge(Authorization auth){
+    private Challenge tlsAlpnChallenge(Authorization auth) throws IOException {
         String domainName = auth.getIdentifier().getDomain();
         TlsAlpn01Challenge challenge = auth.findChallenge(TlsAlpn01Challenge.class);
 
@@ -181,19 +253,19 @@ public class Jale {
     public void fetchCertificate(Collection<String> domains, String password, String email) throws AcmeException, IOException, CertificateException, NoSuchAlgorithmException, KeyStoreException {
         // Load the user key file. If there is no key file, create a new one.
         KeyPair userKeyPair = loadOrCreateUserKeyPair();
-        LOG.debug("Success load the user's key pair.");
+        System.out.println("Success load the user's key pair.");
 
         // Create a session for Let's Encrypt.
         Session session = new Session(acmeServerUrl);
 
         // Get the Account.
         // If there is no account yet, create a new one.
-        Account acct = findOrRegisterAccount(session, userKeyPair, email);
-        LOG.debug("Success get the let's encrypt account.");
+        Account acct = findOrRegisterAccount(session, userKeyPair); // email
+//        LOG.debug("Success get the let's encrypt account.");
 
         // Load or create a key pair for the domains. This should not be the userKeyPair!
         KeyPair domainKeyPair = loadOrCreateDomainKeyPair();
-        LOG.debug("Success load domain's key pair.");
+//        LOG.debug("Success load domain's key pair.");
 
         // Order the certificate
         //* Short-Term Automatic Renewal based certificates cannot be revoked.
@@ -228,9 +300,9 @@ public class Jale {
         try {
             int attempts = 10;
             while (order.getStatus() != Status.VALID && attempts-- > 0) {
-                LOG.info("Current order status: {}, attempts: {}", order.getStatus(), attempts);
+//                LOG.info("Current order status: {}, attempts: {}", order.getStatus(), attempts);
                 if (order.getStatus() == Status.INVALID) {
-                    LOG.error("Order has failed, reason: {}", order.getError());
+//                    LOG.error("Order has failed, reason: {}", order.getError());
 //                    throw new AcmeException("Order failed... Giving up.");
                 }
 
@@ -241,7 +313,7 @@ public class Jale {
                 order.update();
             }
         } catch (InterruptedException ex) {
-            LOG.error("interrupted", ex);
+//            LOG.error("interrupted", ex);
             Thread.currentThread().interrupt();
         }
 
@@ -284,7 +356,7 @@ public class Jale {
 
         // If the challenge is already verified, there's no need to execute it again.
         if (challenge.getStatus() == Status.VALID) {
-            LOG.info("Current challenge status: {}, no need to start challenge.", challenge.getStatus());
+//            LOG.info("Current challenge status: {}, no need to start challenge.", challenge.getStatus());
             return;
         }
 
@@ -295,9 +367,9 @@ public class Jale {
         try {
             int attempts = 10;
             while (challenge.getStatus() != Status.VALID && attempts-- > 0) {
-                LOG.info("Current challenge status: {}, attempts left: {}", challenge.getStatus(), attempts);
+//                LOG.info("Current challenge status: {}, attempts left: {}", challenge.getStatus(), attempts);
                 if (challenge.getStatus() == Status.INVALID) {
-                    LOG.error("Challenge has failed, reason: {}", challenge.getError());
+//                    LOG.error("Challenge has failed, reason: {}", challenge.getError());
                     throw new AcmeException("Challenge failed... Giving up.");
                 }
 
@@ -308,7 +380,7 @@ public class Jale {
                 challenge.update();
             }
         } catch (InterruptedException ex) {
-            LOG.error("interrupted", ex);
+//            LOG.error("interrupted", ex);
             Thread.currentThread().interrupt();
         }
 
@@ -318,7 +390,7 @@ public class Jale {
                     + auth.getIdentifier().getDomain() + ", ... Giving up.");
         }
 
-        LOG.info("Challenge has been completed. Remember to remove the validation resource.");
+//        LOG.info("Challenge has been completed. Remember to remove the validation resource.");
     }
 
     public static void main(String[] args) {
