@@ -12,10 +12,12 @@ public class NanoTLSServer implements Runnable {
     private X509Certificate serverCertificate;
     private boolean running = true;
     SSLSocket sslSocket = null;
+    int serverPort = 5001;  //Pebble's default tlsPort
 
-    public NanoTLSServer(KeyPair sKP, X509Certificate serCert) {
+    public NanoTLSServer(KeyPair sKP, X509Certificate serCert, int port) {
         serverKeyPair = sKP;
         serverCertificate = serCert;
+        serverPort = port;
         // store parameter for later user
     }
 
@@ -33,13 +35,17 @@ public class NanoTLSServer implements Runnable {
 
     public void run() {
         try {
+            /*
             KeyStore ks = KeyStore.getInstance("PKCS12");
             FileInputStream inputStream = new FileInputStream("D:\\work\\Jale\\challengeCert.pfx");
             ks.load(inputStream, "changeit".toCharArray());
             inputStream.close();
-/*
+
+             */
+
         // create the KeyStore and load the JKS file
         KeyStore ks = KeyStore.getInstance("JKS");
+        ks.load(null, null);    // initialize
         X509Certificate[] chain = new X509Certificate[] { serverCertificate };
 
         String alias1 = serverCertificate.getSubjectX500Principal().getName();
@@ -47,7 +53,7 @@ public class NanoTLSServer implements Runnable {
 
 // store the private key
         ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
-*/
+
 
 // may take a look of https://docs.oracle.com/javase/10/security/sample-code-illustrating-secure-socket-connection-client-and-server.htm#JSSEC-GUID-3561ED02-174C-4E65-8BB1-5995E9B7282C
             // initialize key and trust manager factory
@@ -73,30 +79,27 @@ public class NanoTLSServer implements Runnable {
 
             final SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
 
-            final int serverPort = 8443;
+
             final SSLServerSocket sslServerSocket = (SSLServerSocket) sslServerSocketFactory
                     .createServerSocket(serverPort);
 
 //        sslServerSocket.setNeedClientAuth(true);
             sslServerSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
-/*
-        final TestRunnable testRunnable = new TestRunnable(serverPort);
-        final Thread thread = new Thread(testRunnable);
-        thread.start();
- */
+
+            System.out.println("SSL Server is ready!");
+
             //LetsEncrypt will visit this SSL server from multiple IPs
             // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
             while (running) {
                 sslSocket = (SSLSocket) sslServerSocket.accept();
                 // Get an SSLParameters object from the SSLSocket
                 SSLParameters sslp = sslSocket.getSSLParameters();
-
-                //todo
+/*
                 SNIHostName serverName = new SNIHostName("test.bletchley19.com");
                 List<SNIServerName> serverNames = new ArrayList<>(1);
                 serverNames.add(serverName);
                 sslp.setServerNames(serverNames);
-
+*/
                 // Populate SSLParameters with the ALPN values
                 // As this is server side, put them in order of preference
 //        String[] serverAPs ={ "h2", "http/1.1", "tls-alpn-01" };

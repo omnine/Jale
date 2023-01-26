@@ -31,12 +31,14 @@ public class Jale {
     // RSA key size of generated key pairs
     private static final int KEY_SIZE = 2048;
 
+    private int serverPort = 5001;
+
     NanoTLSServer nanoServer = null;
 
     // Create a session for Let's Encrypt.
     // Use "acme://letsencrypt.org" for production server
-    String acmeServerUrl = "acme://letsencrypt.org/staging";
-
+//    String acmeServerUrl = "acme://letsencrypt.org/staging";
+    String acmeServerUrl = "https://localhost:14000/dir"; //pebble directory
     /**
      * Loads a user key pair from {@link #USER_KEY_FILE}. If the file does not exist, a
      * new key pair is generated and saved.
@@ -177,17 +179,13 @@ public class Jale {
 
         final SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
 
-        final int serverPort = 8443;
+
         final SSLServerSocket sslServerSocket = (SSLServerSocket) sslServerSocketFactory
                 .createServerSocket(serverPort);
 
 //        sslServerSocket.setNeedClientAuth(true);
         sslServerSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
-/*
-        final TestRunnable testRunnable = new TestRunnable(serverPort);
-        final Thread thread = new Thread(testRunnable);
-        thread.start();
- */
+
         //LetsEncrypt will visit this SSL server from multiple IPs
         // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
         while (true) {
@@ -256,19 +254,18 @@ public class Jale {
     }
 
     private Challenge tlsAlpnChallenge(Authorization auth) throws IOException {
-        String domainName = auth.getIdentifier().getDomain();
+//        String domainName = auth.getIdentifier().getDomain();
         TlsAlpn01Challenge challenge = auth.findChallenge(TlsAlpn01Challenge.class);
 
         Identifier identifier = auth.getIdentifier();
         byte[] acmeValidation = challenge.getAcmeValidation();
-        KeyPair certKeyPair = KeyPairUtils.createKeyPair(2048);
+        KeyPair certKeyPair = KeyPairUtils.createKeyPair(KEY_SIZE);
         X509Certificate cert = CertificateUtils.
                 createTlsAlpn01Certificate(certKeyPair, identifier, acmeValidation);
 
         //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
-        nanoServer = new NanoTLSServer(certKeyPair, cert);
+        nanoServer = new NanoTLSServer(certKeyPair, cert, serverPort);
         new Thread(nanoServer).start();
-        //shall we sleep a few seconds?
         return challenge;
     }
 
@@ -385,6 +382,12 @@ public class Jale {
         // Find the desired challenge and prepare it.
         Challenge challenge =  tlsAlpnChallenge(auth);
 
+        //shall we sleep a few seconds?
+        try {
+            Thread.sleep(4000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         // If the challenge is already verified, there's no need to execute it again.
         if (challenge.getStatus() == Status.VALID) {
@@ -392,6 +395,7 @@ public class Jale {
             return;
         }
 
+        System.out.println("Start to trigger!!");
         // Now trigger the challenge.
         challenge.trigger();
 
@@ -406,7 +410,7 @@ public class Jale {
                 }
 
                 // Wait for a few seconds
-                Thread.sleep(3000L);
+                Thread.sleep(2000L);
 
                 // Then update the status
                 challenge.update();
@@ -433,9 +437,9 @@ public class Jale {
         String[] domainsTest ={ "test.bletchley19.com" };
         Collection<String> domains = Arrays.asList(domainsTest);
         try {
-            Jale ct = new Jale();
-            ct.startSSLServer(null, null);
-//            ct.fetchCertificate(domains, "changeit", "support@bletvhley19.com");
+            Jale jale = new Jale();
+//            jale.startSSLServer(null, null);
+            jale.fetchCertificate(domains, "changeit", "support@bletchley19.com");
         } catch (Exception ex) {
             System.out.println("Failed to get a certificate for domains " + domains + ex);
         }
