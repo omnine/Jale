@@ -4,6 +4,7 @@ import org.shredzone.acme4j.Certificate;
 import org.shredzone.acme4j.challenge.Challenge;
 import org.shredzone.acme4j.challenge.TlsAlpn01Challenge;
 import org.shredzone.acme4j.exception.AcmeException;
+import org.shredzone.acme4j.util.CSRBuilder;
 import org.shredzone.acme4j.util.CertificateUtils;
 import org.shredzone.acme4j.util.KeyPairUtils;
 
@@ -27,6 +28,11 @@ public class Jale {
 
     // File name of the Domain Key Pair
     private static final File DOMAIN_KEY_FILE = new File("domain.key");
+
+    private static final File DOMAIN_CSR_FILE = new File("domain.csr");
+
+    // File name of the signed certificate
+    private static final File DOMAIN_CHAIN_FILE = new File("domain-chain.crt");
 
     // RSA key size of generated key pairs
     private static final int KEY_SIZE = 2048;
@@ -308,7 +314,7 @@ public class Jale {
         for (Authorization auth : order.getAuthorizations()) {
             authorize(auth);
         }
-/*
+
         // Generate a CSR for all of the domains, and sign it with the domain key pair.
         CSRBuilder csrb = new CSRBuilder();
         csrb.addDomains(domains);
@@ -321,7 +327,7 @@ public class Jale {
 
         // Order the certificate
         order.execute(csrb.getEncoded());
-*/
+
         // Wait for the order to complete
         try {
             int attempts = 10;
@@ -333,7 +339,8 @@ public class Jale {
                 }
 
                 // Wait for a few seconds
-                Thread.sleep(3000L);
+                Thread.sleep(2000L);
+                System.out.println("loop to check order status");
 
                 // Then update the status
                 order.update();
@@ -349,16 +356,17 @@ public class Jale {
         // Get the certificate
         org.shredzone.acme4j.Certificate certificate = order.getCertificate();
 
-        System.out.println("Success! The certificate for domains has been generated!");
 
-
-/*
-        LOG.info("Certificate URL: {}", certificate.getLocation());
+        assert certificate != null;
+        System.out.println("Certificate URL: " + certificate.getLocation().toString());
 
         // Write a combined file containing the certificate and chain.
         try (FileWriter fw = new FileWriter(DOMAIN_CHAIN_FILE)) {
             certificate.writeCertificate(fw);
         }
+        System.out.println("Success! The certificate for domains has been generated!");
+/*
+
         byte[] pfxBytes;
         java.security.cert.Certificate[] certs = certificate.getCertificateChain().stream().toArray(java.security.cert.Certificate[]::new);
         try {
@@ -411,6 +419,7 @@ public class Jale {
 
                 // Wait for a few seconds
                 Thread.sleep(2000L);
+                System.out.println("loop to check challenge status");
 
                 // Then update the status
                 challenge.update();
