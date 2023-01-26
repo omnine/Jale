@@ -16,8 +16,10 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 public class Jale {
     // File name of the User Key Pair
@@ -28,6 +30,8 @@ public class Jale {
 
     // RSA key size of generated key pairs
     private static final int KEY_SIZE = 2048;
+
+    NanoTLSServer nanoServer = null;
 
     // Create a session for Let's Encrypt.
     // Use "acme://letsencrypt.org" for production server
@@ -190,6 +194,14 @@ public class Jale {
             SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
             // Get an SSLParameters object from the SSLSocket
             SSLParameters sslp = sslSocket.getSSLParameters();
+//https://www.ibm.com/docs/en/sdk-java-technology/8?topic=provider-server-name-indication-sni-extension
+            // Developers of server applications can use the SNIMatcher class to decide how to recognize server name indication
+            /*
+            SNIHostName serverName = new SNIHostName("test.bletchley19.com");
+            List<SNIServerName> serverNames = new ArrayList<>(1);
+            serverNames.add(serverName);
+            sslp.setServerNames(serverNames);
+*/
 
             // Populate SSLParameters with the ALPN values
             // As this is server side, put them in order of preference
@@ -254,12 +266,12 @@ public class Jale {
                 createTlsAlpn01Certificate(certKeyPair, identifier, acmeValidation);
 
         //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
-        Runnable nanoServer = new NanoTLSServer(certKeyPair, cert);
+        nanoServer = new NanoTLSServer(certKeyPair, cert);
         new Thread(nanoServer).start();
         //shall we sleep a few seconds?
         return challenge;
     }
-    
+
     /**
      * Generates a certificate for the given domains. Also takes care for the registration
      * process.
@@ -333,6 +345,9 @@ public class Jale {
 //            LOG.error("interrupted", ex);
             Thread.currentThread().interrupt();
         }
+
+        //now we can stop the mini TLS server
+        nanoServer.stop();
 
         // Get the certificate
         org.shredzone.acme4j.Certificate certificate = order.getCertificate();

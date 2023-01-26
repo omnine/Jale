@@ -1,17 +1,34 @@
 import javax.net.ssl.*;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 
 public class NanoTLSServer implements Runnable {
     private KeyPair serverKeyPair;
     private X509Certificate serverCertificate;
+    private boolean running = true;
+    SSLSocket sslSocket = null;
 
     public NanoTLSServer(KeyPair sKP, X509Certificate serCert) {
         serverKeyPair = sKP;
         serverCertificate = serCert;
         // store parameter for later user
+    }
+
+    public void stop() {
+        running = false;
+        //also close the socket
+        if(sslSocket != null) {
+            try {
+                sslSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void run() {
@@ -69,10 +86,16 @@ public class NanoTLSServer implements Runnable {
  */
             //LetsEncrypt will visit this SSL server from multiple IPs
             // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
-            while (true) {
-                SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
+            while (running) {
+                sslSocket = (SSLSocket) sslServerSocket.accept();
                 // Get an SSLParameters object from the SSLSocket
                 SSLParameters sslp = sslSocket.getSSLParameters();
+
+                //todo
+                SNIHostName serverName = new SNIHostName("test.bletchley19.com");
+                List<SNIServerName> serverNames = new ArrayList<>(1);
+                serverNames.add(serverName);
+                sslp.setServerNames(serverNames);
 
                 // Populate SSLParameters with the ALPN values
                 // As this is server side, put them in order of preference
