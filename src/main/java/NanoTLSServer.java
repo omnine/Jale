@@ -7,7 +7,8 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NanoTLSServer implements Runnable {
+public class NanoTLSServer extends Thread {
+    SSLServerSocket sslServerSocket = null;
     private KeyPair serverKeyPair;
     private X509Certificate serverCertificate;
     private boolean running = true;
@@ -21,27 +22,28 @@ public class NanoTLSServer implements Runnable {
         // store parameter for later user
     }
 
-    public void stop() {
+    public void interrupt() {
+        System.out.println("call stop");
         running = false;
         //also close the socket
-        if(sslSocket != null) {
-            try {
-                sslSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            sslServerSocket.close();
+        } catch (IOException ignored) {
+        }  finally {
+            super.interrupt();
         }
     }
 
     public void run() {
+
         try {
-            /*
+
             KeyStore ks = KeyStore.getInstance("PKCS12");
             FileInputStream inputStream = new FileInputStream("D:\\work\\Jale\\challengeCert.pfx");
             ks.load(inputStream, "changeit".toCharArray());
             inputStream.close();
 
-             */
+            /*
 
         // create the KeyStore and load the JKS file
         KeyStore ks = KeyStore.getInstance("JKS");
@@ -53,7 +55,7 @@ public class NanoTLSServer implements Runnable {
 
 // store the private key
         ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
-
+             */
 
 // may take a look of https://docs.oracle.com/javase/10/security/sample-code-illustrating-secure-socket-connection-client-and-server.htm#JSSEC-GUID-3561ED02-174C-4E65-8BB1-5995E9B7282C
             // initialize key and trust manager factory
@@ -80,55 +82,63 @@ public class NanoTLSServer implements Runnable {
             final SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
 
 
-            final SSLServerSocket sslServerSocket = (SSLServerSocket) sslServerSocketFactory
+            sslServerSocket = (SSLServerSocket) sslServerSocketFactory
                     .createServerSocket(serverPort);
 
 //        sslServerSocket.setNeedClientAuth(true);
             sslServerSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
 
             System.out.println("SSL Server is ready!");
-
+        }
+        catch (Exception ex) {
+            System.out.println("Error: " + ex);
+        }
             //LetsEncrypt will visit this SSL server from multiple IPs
             // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
             while (running) {
-                sslSocket = (SSLSocket) sslServerSocket.accept();
-                // Get an SSLParameters object from the SSLSocket
-                SSLParameters sslp = sslSocket.getSSLParameters();
+
+                try {
+                    assert sslServerSocket != null;
+                    sslSocket = (SSLSocket) sslServerSocket.accept();
+                    // Get an SSLParameters object from the SSLSocket
+                    SSLParameters sslp = sslSocket.getSSLParameters();
 /*
                 SNIHostName serverName = new SNIHostName("test.bletchley19.com");
                 List<SNIServerName> serverNames = new ArrayList<>(1);
                 serverNames.add(serverName);
                 sslp.setServerNames(serverNames);
 */
-                // Populate SSLParameters with the ALPN values
-                // As this is server side, put them in order of preference
+                    // Populate SSLParameters with the ALPN values
+                    // As this is server side, put them in order of preference
 //        String[] serverAPs ={ "h2", "http/1.1", "tls-alpn-01" };
-                String[] serverAPs = {"acme-tls/1"};
-                sslp.setApplicationProtocols(serverAPs);
+                    String[] serverAPs = {"acme-tls/1"};
+                    sslp.setApplicationProtocols(serverAPs);
 
-                // If necessary at any time, get the ALPN values set on the
-                // SSLParameters object with:
-                // String serverAPs = sslp.setApplicationProtocols();
+                    // If necessary at any time, get the ALPN values set on the
+                    // SSLParameters object with:
+                    // String serverAPs = sslp.setApplicationProtocols();
 
-                // Populate the SSLSocket object with the ALPN values
-                sslSocket.setSSLParameters(sslp);
+                    // Populate the SSLSocket object with the ALPN values
+                    sslSocket.setSSLParameters(sslp);
 
-                sslSocket.startHandshake();
+                    sslSocket.startHandshake();
 
-                // After the handshake, get the application protocol that
-                // has been negotiated
+                    // After the handshake, get the application protocol that
+                    // has been negotiated
 
-                String ap = sslSocket.getApplicationProtocol();
-                System.out.println("Application Protocol server side: \"" + ap + "\"");
+                    String ap = sslSocket.getApplicationProtocol();
+                    System.out.println("Application Protocol server side: \"" + ap + "\"");
 
-                // Continue with the work of the server
-                sslSocket.close();
+                    // Continue with the work of the server
+                    sslSocket.close();
+
+                }  catch (Exception se) {
+                    break;
+                }
+
             }
 
-        }
-        catch (Exception ex) {
-            System.out.println("Error: " + ex);
-        }
 
+        System.out.println("Thread finish");
     }
 }

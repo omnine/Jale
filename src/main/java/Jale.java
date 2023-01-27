@@ -275,6 +275,19 @@ public class Jale {
         return challenge;
     }
 
+
+    public void testThread() {
+        //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
+        nanoServer = new NanoTLSServer(null, null, serverPort);
+        nanoServer.start();
+    }
+
+    public void stopThread() {
+        //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
+        nanoServer.interrupt();
+    }
+
+
     /**
      * Generates a certificate for the given domains. Also takes care for the registration
      * process.
@@ -448,7 +461,12 @@ public class Jale {
         try {
             Jale jale = new Jale();
 //            jale.startSSLServer(null, null);
-            jale.fetchCertificate(domains, "changeit", "support@bletchley19.com");
+//            jale.fetchCertificate(domains, "changeit", "support@bletchley19.com");
+
+            jale.testThread();
+            Thread.sleep(5000);
+            jale.stopThread();
+            Thread.sleep(5000);
         } catch (Exception ex) {
             System.out.println("Failed to get a certificate for domains " + domains + ex);
         }
