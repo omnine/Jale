@@ -7,12 +7,14 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NanoTLSServer implements Runnable {
+public class NanoTLSServer extends Thread {
     private KeyPair serverKeyPair;
     private X509Certificate serverCertificate;
-    private boolean running = true;
-    SSLSocket sslSocket = null;
-    int serverPort = 5001;  //Pebble's default tlsPort
+    private boolean listening = true;
+
+    private SSLServerSocket sslServerSocket = null;
+
+    private  int serverPort = 5001;  //Pebble's default tlsPort
 
     public NanoTLSServer(KeyPair sKP, X509Certificate serCert, int port) {
         serverKeyPair = sKP;
@@ -21,38 +23,33 @@ public class NanoTLSServer implements Runnable {
         // store parameter for later user
     }
 
-    public void stop() {
-        running = false;
+    //https://codeahoy.com/java/How-To-Stop-Threads-Safely/
+    public void interrupt() {
+        listening = false;
         //also close the socket
-        if(sslSocket != null) {
+        if(sslServerSocket != null) {
             try {
-                sslSocket.close();
+                sslServerSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+            finally {
+                super.interrupt();
             }
         }
     }
 
     public void run() {
         try {
-            /*
-            KeyStore ks = KeyStore.getInstance("PKCS12");
-            FileInputStream inputStream = new FileInputStream("D:\\work\\Jale\\challengeCert.pfx");
-            ks.load(inputStream, "changeit".toCharArray());
-            inputStream.close();
+            // create the KeyStore and initialize
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(null, null);
+            X509Certificate[] chain = new X509Certificate[] { serverCertificate };
 
-             */
-
-        // create the KeyStore and load the JKS file
-        KeyStore ks = KeyStore.getInstance("JKS");
-        ks.load(null, null);    // initialize
-        X509Certificate[] chain = new X509Certificate[] { serverCertificate };
-
-        String alias1 = serverCertificate.getSubjectX500Principal().getName();
-        ks.setCertificateEntry(alias1, serverCertificate);
-
-// store the private key
-        ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
+            String alias = serverCertificate.getSubjectX500Principal().getName();
+            ks.setCertificateEntry(alias, serverCertificate);
+            // store the private key
+            ks.setKeyEntry("nanoart", serverKeyPair.getPrivate(), "changeit".toCharArray(), chain );
 
 
 // may take a look of https://docs.oracle.com/javase/10/security/sample-code-illustrating-secure-socket-connection-client-and-server.htm#JSSEC-GUID-3561ED02-174C-4E65-8BB1-5995E9B7282C
@@ -78,10 +75,7 @@ public class NanoTLSServer implements Runnable {
 
 
             final SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
-
-
-            final SSLServerSocket sslServerSocket = (SSLServerSocket) sslServerSocketFactory
-                    .createServerSocket(serverPort);
+            sslServerSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(serverPort);
 
 //        sslServerSocket.setNeedClientAuth(true);
             sslServerSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
@@ -90,11 +84,13 @@ public class NanoTLSServer implements Runnable {
 
             //LetsEncrypt will visit this SSL server from multiple IPs
             // NIO to be implemented, https://stackoverflow.com/questions/53323855/sslserversocket-and-certificate-setup
-            while (running) {
-                sslSocket = (SSLSocket) sslServerSocket.accept();
+            while (listening) {
+                SSLSocket sslSocket = (SSLSocket) sslServerSocket.accept();
                 // Get an SSLParameters object from the SSLSocket
                 SSLParameters sslp = sslSocket.getSSLParameters();
 /*
+                // Developers of server applications can use the SNIMatcher class to decide how to recognize server name indication
+                // This is for client side,
                 SNIHostName serverName = new SNIHostName("test.bletchley19.com");
                 List<SNIServerName> serverNames = new ArrayList<>(1);
                 serverNames.add(serverName);
@@ -102,7 +98,7 @@ public class NanoTLSServer implements Runnable {
 */
                 // Populate SSLParameters with the ALPN values
                 // As this is server side, put them in order of preference
-//        String[] serverAPs ={ "h2", "http/1.1", "tls-alpn-01" };
+//        String[] serverAPs ={ "h2", "http/1.1"};
                 String[] serverAPs = {"acme-tls/1"};
                 sslp.setApplicationProtocols(serverAPs);
 
@@ -129,6 +125,6 @@ public class NanoTLSServer implements Runnable {
         catch (Exception ex) {
             System.out.println("Error: " + ex);
         }
-
+        System.out.println("Thread finished");
     }
 }

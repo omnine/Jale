@@ -17,10 +17,10 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
-import java.util.ArrayList;
+
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
+
 
 public class Jale {
     // File name of the User Key Pair
@@ -271,7 +271,7 @@ public class Jale {
 
         //We got everything to run a mini SSL server now, before trigger to notify ACME server that applicant is ready to be verified
         nanoServer = new NanoTLSServer(certKeyPair, cert, serverPort);
-        new Thread(nanoServer).start();
+        nanoServer.start();
         return challenge;
     }
 
@@ -351,7 +351,7 @@ public class Jale {
         }
 
         //now we can stop the mini TLS server
-        nanoServer.stop();
+        nanoServer.interrupt();
 
         // Get the certificate
         org.shredzone.acme4j.Certificate certificate = order.getCertificate();
@@ -390,7 +390,7 @@ public class Jale {
         // Find the desired challenge and prepare it.
         Challenge challenge =  tlsAlpnChallenge(auth);
 
-        //shall we sleep a few seconds?
+        //we sleep a few seconds to allow the TLS server becomes ready
         try {
             Thread.sleep(4000);
         } catch (InterruptedException e) {
